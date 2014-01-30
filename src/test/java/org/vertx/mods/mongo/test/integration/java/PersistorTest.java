@@ -128,6 +128,26 @@ public class PersistorTest extends TestVerticle {
       }
     });
   }
+  
+  @Test
+  public void testInsertDocument() throws Exception {
+    JsonObject document = new JsonObject()
+      .putString("name", "michael fly")
+      .putNumber("age", 55)
+      .putString("cat-name", "scott");
+    
+    JsonObject action = new JsonObject()
+      .putString("collection", "testcoll")
+      .putString("action", "insert")
+      .putObject("document", document);
+    
+    eb.send("test.persistor", action, new Handler<Message<JsonObject>>() {
+      public void handle(Message<JsonObject> reply) {
+        assertEquals("ok", reply.body().getString("status"));
+        testComplete();
+      }
+    });
+  }
 
 }
 

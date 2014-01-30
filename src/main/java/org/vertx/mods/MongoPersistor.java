@@ -133,6 +133,9 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
       // I have kept the version with camel case so as not to break compatibility
 
       switch (action) {
+        case "insert":
+          doInsert(message);
+          break;
         case "save":
           doSave(message);
           break;
@@ -174,6 +177,46 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     }
   }
 
+  private void doInsert(Message<JsonObject> message) {
+    String collection = getMandatoryString("collection", message);
+    if (collection == null) {
+      return;
+    }
+    JsonObject doc = getMandatoryObject("document", message);
+    if (doc == null) {
+      return;
+    }
+    String genID;
+    if (doc.getField("_id") == null) {
+      genID = UUID.randomUUID().toString();
+      doc.putString("_id", genID);
+    } else {
+      genID = null;
+    }
+    DBCollection coll = db.getCollection(collection);
+    DBObject obj = jsonToDBObject(doc);
+    WriteConcern writeConcern = WriteConcern.valueOf(getOptionalStringConfig("writeConcern", ""));
+    // Backwards compatibility
+    if (writeConcern == null) {
+      writeConcern = WriteConcern.valueOf(getOptionalStringConfig("write_concern", ""));
+    }
+    if (writeConcern == null) {
+      writeConcern = db.getWriteConcern();
+    }
+    WriteResult res = coll.insert(obj, writeConcern);
+    if (res.getError() == null) {
+      if (genID != null) {
+        JsonObject reply = new JsonObject();
+        reply.putString("_id", genID);
+        sendOK(message, reply);
+      } else {
+        sendOK(message);
+      }
+    } else {
+      sendError(message, res.getError());
+    }
+  }
+  
   private void doSave(Message<JsonObject> message) {
     String collection = getMandatoryString("collection", message);
     if (collection == null) {
